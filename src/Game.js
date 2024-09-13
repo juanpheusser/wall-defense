@@ -1,5 +1,7 @@
 // src/Game.js
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { GiWreckingBall, GiCornerExplosion, GiStoneWall, GiCannon } from "react-icons/gi";
+import { renderToStaticMarkup } from 'react-dom/server';
 
 function Game({ onGameOver }) {
   const canvasRef = useRef(null);
@@ -28,14 +30,15 @@ function Game({ onGameOver }) {
     minPower: 3,
     maxPower: 30,
     powerIncrement: 0.3,
-    cannonPos: { x: 50, y: 500 },
-    cannonLength: 50,
+    cannonPos: { x: 30, y: 490 },
+    cannonSize: 60, // size of the cannon icon
     cannonBalls: 1,
     pierce: 1,
     
     // Game objects
     cannonballs: [],
     attackers: [],
+    explosions: [],
     
     // Input flags
     angleUp: false,
@@ -91,9 +94,75 @@ function Game({ onGameOver }) {
     return () => clearInterval(powerUpInterval);
   }, []);
 
+  const cannonballImageRef = useRef(null);
+  const explosionImageRef = useRef(null);
+  const wallImageRef = useRef(null);
+  const cannonImageRef = useRef(null);
+
+  useEffect(() => {
+    // Create cannonball image
+    const cannonballSvgString = encodeURIComponent(renderToStaticMarkup(<GiWreckingBall />));
+    const cannonballImg = new Image();
+    cannonballImg.src = `data:image/svg+xml,${cannonballSvgString}`;
+    cannonballImg.onload = () => {
+      cannonballImageRef.current = cannonballImg;
+    };
+
+    // Create explosion image
+    const explosionSvgString = encodeURIComponent(renderToStaticMarkup(<GiCornerExplosion />));
+    const explosionImg = new Image();
+    explosionImg.src = `data:image/svg+xml,${explosionSvgString}`;
+    explosionImg.onload = () => {
+      explosionImageRef.current = explosionImg;
+    };
+
+    // Create wall image
+    const wallSvgString = encodeURIComponent(renderToStaticMarkup(<GiStoneWall />));
+    const wallImg = new Image();
+    wallImg.src = `data:image/svg+xml,${wallSvgString}`;
+    wallImg.onload = () => {
+      wallImageRef.current = wallImg;
+    };
+
+    // Create cannon image
+    const cannonSvgString = encodeURIComponent(renderToStaticMarkup(<GiCannon />));
+    const cannonImg = new Image();
+    cannonImg.src = `data:image/svg+xml,${cannonSvgString}`;
+    cannonImg.onload = () => {
+      cannonImageRef.current = cannonImg;
+    };
+  }, []);
+
+  class Explosion {
+    constructor(x, y) {
+      this.x = x;
+      this.y = y;
+      this.size = 30;
+      this.duration = 10; // Number of frames the explosion lasts
+      this.frame = 0;
+    }
+
+    update() {
+      this.frame++;
+    }
+
+    isFinished() {
+      return this.frame >= this.duration;
+    }
+
+    draw(context) {
+      if (explosionImageRef.current) {
+        const opacity = 1 - (this.frame / this.duration);
+        context.globalAlpha = opacity;
+        context.drawImage(explosionImageRef.current, this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+        context.globalAlpha = 1;
+      }
+    }
+  }
+
   class CannonBall {
     constructor(x, y, angle, power) {
-      this.radius = 5;
+      this.radius = 10;
       this.x = x;
       this.y = y;
       const angleRad = (-angle * Math.PI) / 180;
@@ -113,10 +182,16 @@ function Game({ onGameOver }) {
     }
     
     draw(context) {
-      context.fillStyle = 'black';
-      context.beginPath();
-      context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-      context.fill();
+      if (cannonballImageRef.current) {
+        const size = this.radius * 2;
+        context.drawImage(cannonballImageRef.current, this.x - this.radius, this.y - this.radius, size, size);
+      } else {
+        // Fallback to drawing a circle if the image hasn't loaded yet
+        context.fillStyle = 'black';
+        context.beginPath();
+        context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        context.fill();
+      }
     }
   }
   
@@ -198,6 +273,9 @@ function Game({ onGameOver }) {
       for (let j = attackers.length - 1; j >= 0; j--) {
         const attacker = attackers[j];
         if (isColliding(cannonball, attacker)) {
+          // Create an explosion at the point of impact
+          gameStateRef.current.explosions.push(new Explosion(cannonball.x, cannonball.y));
+
           if (attacker.columns === 1) {
             attacker.reduceHeight();
             if (attacker.isDestroyed()) {
@@ -241,19 +319,43 @@ function Game({ onGameOver }) {
     context.clearRect(0, 0, canvas.width, canvas.height);
     
     // Draw wall
-    context.fillStyle = 'black';
-    context.fillRect(0, gameState.HEIGHT - gameState.wallHeight, gameState.wallWidth, gameState.wallHeight);
+    if (wallImageRef.current) {
+      const wallPattern = context.createPattern(wallImageRef.current, 'repeat');
+      context.save();
+      context.fillStyle = wallPattern;
+      context.fillRect(0, gameState.HEIGHT - gameState.wallHeight, gameState.wallWidth, gameState.wallHeight);
+      context.restore();
+    } else {
+      // Fallback to a solid color if the image hasn't loaded
+      context.fillStyle = 'gray';
+      context.fillRect(0, gameState.HEIGHT - gameState.wallHeight, gameState.wallWidth, gameState.wallHeight);
+    }
     
     // Draw cannon
-    const angleRad = (-gameState.cannonAngle * Math.PI) / 180;
-    const endX = gameState.cannonPos.x + gameState.cannonLength * Math.cos(angleRad);
-    const endY = gameState.cannonPos.y + gameState.cannonLength * Math.sin(angleRad);
-    context.strokeStyle = 'black';
-    context.lineWidth = 5;
-    context.beginPath();
-    context.moveTo(gameState.cannonPos.x, gameState.cannonPos.y);
-    context.lineTo(endX, endY);
-    context.stroke();
+    if (cannonImageRef.current) {
+      context.save();
+      context.translate(gameState.cannonPos.x, gameState.cannonPos.y);
+      context.rotate((-gameState.cannonAngle * Math.PI) / 180);
+      context.drawImage(
+        cannonImageRef.current, 
+        -gameState.cannonSize / 2, 
+        -gameState.cannonSize / 2, 
+        gameState.cannonSize, 
+        gameState.cannonSize
+      );
+      context.restore();
+    } else {
+      // Fallback to drawing a simple cannon if the image hasn't loaded
+      const angleRad = (-gameState.cannonAngle * Math.PI) / 180;
+      const endX = gameState.cannonPos.x + gameState.cannonSize * Math.cos(angleRad);
+      const endY = gameState.cannonPos.y + gameState.cannonSize * Math.sin(angleRad);
+      context.strokeStyle = 'black';
+      context.lineWidth = 5;
+      context.beginPath();
+      context.moveTo(gameState.cannonPos.x, gameState.cannonPos.y);
+      context.lineTo(endX, endY);
+      context.stroke();
+    }
     
     // Draw cannonballs
     gameState.cannonballs.forEach((cannonball) => {
@@ -301,6 +403,11 @@ function Game({ onGameOver }) {
       context.fillText(flashingPowerUpRef.current, gameState.WIDTH / 2, gameState.HEIGHT / 2);
       context.restore();
     }
+    
+    // Draw explosions
+    gameState.explosions.forEach(explosion => {
+      explosion.draw(context);
+    });
   };
 
   const spawnAttacker = () => {
@@ -338,14 +445,21 @@ function Game({ onGameOver }) {
 
   const fireCannonball = (power) => {
     const gameState = gameStateRef.current;
+    const angleRad = (-gameState.cannonAngle * Math.PI) / 180;
+    
+    // Calculate the cannon's "muzzle" position
+    const muzzleLength = gameState.cannonSize * 0.1; // Adjust this factor as needed
+    const muzzleX = gameState.cannonPos.x + muzzleLength * Math.cos(angleRad);
+    const muzzleY = gameState.cannonPos.y + muzzleLength * Math.sin(angleRad);
+    
     const baseAngle = gameState.cannonAngle;
     const angleDecrement = 5; // Decrease angle by 5 degrees for each subsequent ball
 
     for (let i = 0; i < gameState.cannonBalls; i++) {
       const currentAngle = baseAngle - (i * angleDecrement);
       const angleRad = (-currentAngle * Math.PI) / 180;
-      const endX = gameState.cannonPos.x + gameState.cannonLength * Math.cos(angleRad);
-      const endY = gameState.cannonPos.y + gameState.cannonLength * Math.sin(angleRad);
+      const endX = muzzleX + gameState.cannonSize * Math.cos(angleRad)*0.5;
+      const endY = muzzleY + gameState.cannonSize * Math.sin(angleRad)*0.5;
       
       // Create the original cannonball
       const cannonball = new CannonBall(endX, endY, currentAngle, power);
@@ -408,6 +522,16 @@ function Game({ onGameOver }) {
     return false;
   };
 
+  const updateExplosions = () => {
+    const explosions = gameStateRef.current.explosions;
+    for (let i = explosions.length - 1; i >= 0; i--) {
+      explosions[i].update();
+      if (explosions[i].isFinished()) {
+        explosions.splice(i, 1);
+      }
+    }
+  };
+
   const gameLoop = (time) => {
     const deltaTime = time - previousTimeRef.current;
     previousTimeRef.current = time;
@@ -455,6 +579,7 @@ function Game({ onGameOver }) {
     
     // Handle collisions
     handleCollisions();
+    updateExplosions();
     
     // Render the game
     renderGame();
