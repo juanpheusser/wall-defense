@@ -26,10 +26,11 @@ function Game({ onGameOver }) {
     cannonAngleSpeed: 2,
     power: 0,
     minPower: 3,
-    maxPower: 25,
+    maxPower: 30,
     powerIncrement: 0.3,
     cannonPos: { x: 50, y: 500 },
     cannonLength: 50,
+    cannonBalls: 1,
     
     // Game objects
     cannonballs: [],
@@ -48,7 +49,7 @@ function Game({ onGameOver }) {
     gameTime: 0,
     spawnInterval: 3000,
     minSpawnInterval: 400,
-    spawnDecreaseRate: 0.995,
+    spawnDecreaseRate: 0.99,
     lastAttackerSpawnTime: performance.now(),
     initialBaseSpeed: 0.5,
     maxBaseSpeed: 5.0,
@@ -62,10 +63,9 @@ function Game({ onGameOver }) {
 
   const powerUps = [
     { name: "+5 base cannon power", effect: () => { gameStateRef.current.minPower += 5; } },
-    { name: "+5 max cannon power", effect: () => { gameStateRef.current.maxPower += 5; } },
     { name: "Faster reload", effect: () => { gameStateRef.current.reloadTime -= 100; } },
-    //{ name: "+1 cannon ball", effect: () => { /* To be implemented */ } },
-    //{ name: "+1 pierce power", effect: () => { /* To be implemented */ } },
+    { name: "Faster power build", effect: () => { gameStateRef.current.powerIncrement += 0.1; } },
+    { name: "+1 cannon ball", effect: () => { gameStateRef.current.cannonBalls += 1; } },
   ];
 
   const grantRandomPowerUp = () => {
@@ -84,7 +84,7 @@ function Game({ onGameOver }) {
   useEffect(() => {
     const powerUpInterval = setInterval(() => {
       grantRandomPowerUp();
-    }, 10000); // 60000 ms = 1 minute
+    }, 30000); // 60000 ms = 1 minute
 
     return () => clearInterval(powerUpInterval);
   }, []);
@@ -263,14 +263,16 @@ function Game({ onGameOver }) {
       attacker.draw(context);
     });
     
-    // Draw power bar
-    context.fillStyle = 'black';
-    context.fillRect(
-      gameState.wallWidth + 10,
-      gameState.HEIGHT - gameState.wallHeight - 50,
-      gameState.power * 5,
-      10
-    );
+    // Draw power bar only when space is pressed
+    if (gameState.spacePressed) {
+      context.fillStyle = 'black';
+      context.fillRect(
+        gameState.wallWidth + 10,
+        gameState.HEIGHT - gameState.wallHeight - 50,
+        gameState.power * 5,
+        10
+      );
+    }
     
     // Draw score and timer
     context.fillStyle = 'black';
@@ -332,23 +334,26 @@ function Game({ onGameOver }) {
     }
   };
 
-  const fireCannonball = () => {
+  const fireCannonball = (power) => {
     const gameState = gameStateRef.current;
-    const angleRad = (-gameState.cannonAngle * Math.PI) / 180;
-    const endX = gameState.cannonPos.x + gameState.cannonLength * Math.cos(angleRad);
-    const endY = gameState.cannonPos.y + gameState.cannonLength * Math.sin(angleRad);
-    const cannonball = new CannonBall(endX, endY, gameState.cannonAngle, gameState.power);
-    gameState.cannonballs.push(cannonball);
+    const baseAngle = gameState.cannonAngle;
+    const angleDecrement = 5; // Decrease angle by 5 degrees for each subsequent ball
+
+    for (let i = 0; i < gameState.cannonBalls; i++) {
+      const currentAngle = baseAngle - (i * angleDecrement);
+      const angleRad = (-currentAngle * Math.PI) / 180;
+      const endX = gameState.cannonPos.x + gameState.cannonLength * Math.cos(angleRad);
+      const endY = gameState.cannonPos.y + gameState.cannonLength * Math.sin(angleRad);
+      const cannonball = new CannonBall(endX, endY, currentAngle, power);
+      gameState.cannonballs.push(cannonball);
+    }
   };
 
   
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.code === 'Space') {
-        if (!gameStateRef.current.spacePressed) {
-          gameStateRef.current.spacePressed = true;
-          gameStateRef.current.power = gameStateRef.current.minPower;
-        }
+        gameStateRef.current.spacePressed = true;
       } else if (e.code === 'ArrowUp') {
         gameStateRef.current.angleUp = true;
       } else if (e.code === 'ArrowDown') {
@@ -358,19 +363,12 @@ function Game({ onGameOver }) {
     
     const handleKeyUp = (e) => {
       if (e.code === 'Space') {
-        if (gameStateRef.current.spacePressed) {
-          const currentTime = performance.now();
-          if (currentTime - gameStateRef.current.lastShotTime >= gameStateRef.current.reloadTime) {
-            // Fire cannonball
-            fireCannonball();
-            gameStateRef.current.power = gameStateRef.current.minPower;
-            gameStateRef.current.spacePressed = false;
-            gameStateRef.current.lastShotTime = currentTime;
-          } else {
-            gameStateRef.current.power = gameStateRef.current.minPower;
-            gameStateRef.current.spacePressed = false;
-          }
+        gameStateRef.current.spacePressed = false;
+        // Fire cannonball logic here, using the current power
+        if (gameStateRef.current.power >= gameStateRef.current.minPower) {
+          fireCannonball(gameStateRef.current.power);
         }
+        gameStateRef.current.power = gameStateRef.current.minPower; // Reset power to minPower after firing
       } else if (e.code === 'ArrowUp') {
         gameStateRef.current.angleUp = false;
       } else if (e.code === 'ArrowDown') {
@@ -430,7 +428,7 @@ function Game({ onGameOver }) {
       }
     }
     
-    // Increase power while space is pressed
+    // Update power build
     if (gameState.spacePressed) {
       gameState.power += gameState.powerIncrement;
       if (gameState.power > gameState.maxPower) {
