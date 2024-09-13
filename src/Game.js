@@ -19,7 +19,7 @@ function Game({ onGameOver }) {
     HEIGHT: 600,
     wallWidth: 50,
     wallHeight: 100,
-    gravity: 0.4,
+    gravity: 0.6,
     
     // Cannon variables
     cannonAngle: 45, // degrees
@@ -627,8 +627,25 @@ function Game({ onGameOver }) {
   
   // We'll fill in the details here
   return (
-    <div>
-      <canvas ref={canvasRef} width={1200} height={600} style={{ border: '1px solid black', display: 'block', margin: '0 auto' }}></canvas>
+    <div style={{ textAlign: 'center' }}>
+      <h1 style={{ 
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '36px',
+        color: '#333',
+        marginBottom: '20px'
+      }}>
+        Wall Defense
+      </h1>
+      <canvas 
+        ref={canvasRef} 
+        width={1200} 
+        height={600} 
+        style={{ 
+          border: '1px solid black',
+          maxWidth: '100%',
+          height: 'auto'
+        }}
+      />
     </div>
   );
 }
