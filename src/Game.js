@@ -31,6 +31,7 @@ function Game({ onGameOver }) {
     cannonPos: { x: 50, y: 500 },
     cannonLength: 50,
     cannonBalls: 1,
+    pierce: 1,
     
     // Game objects
     cannonballs: [],
@@ -66,6 +67,7 @@ function Game({ onGameOver }) {
     { name: "Faster reload", effect: () => { gameStateRef.current.reloadTime -= 100; } },
     { name: "Faster power build", effect: () => { gameStateRef.current.powerIncrement += 0.1; } },
     { name: "+1 cannon ball", effect: () => { gameStateRef.current.cannonBalls += 1; } },
+    { name: "+1 pierce", effect: () => { gameStateRef.current.pierce += 1; } },
   ];
 
   const grantRandomPowerUp = () => {
@@ -344,8 +346,16 @@ function Game({ onGameOver }) {
       const angleRad = (-currentAngle * Math.PI) / 180;
       const endX = gameState.cannonPos.x + gameState.cannonLength * Math.cos(angleRad);
       const endY = gameState.cannonPos.y + gameState.cannonLength * Math.sin(angleRad);
+      
+      // Create the original cannonball
       const cannonball = new CannonBall(endX, endY, currentAngle, power);
       gameState.cannonballs.push(cannonball);
+      
+      // Create additional copies if pierce is greater than 1
+      for (let j = 0; j < gameState.pierce - 1; j++) {
+        const copyCannonball = new CannonBall(endX, endY, currentAngle, power);
+        gameState.cannonballs.push(copyCannonball);
+      }
     }
   };
 
