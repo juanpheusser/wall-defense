@@ -26,8 +26,6 @@ function Menu({ onStart }) {
           <li>Press and hold the spacebar to control firing power</li>
           <li>Release the spacebar to fire cannonballs</li>
           <li>Destroy attackers before they reach your wall</li>
-          <li>Single-column attackers are destroyed in one hit</li>
-          <li>Double-column attackers require two hits to destroy</li>
           <li>Score points for each attacker destroyed</li>
           <li>The game ends if any attacker reaches your wall</li>
         </ol>
