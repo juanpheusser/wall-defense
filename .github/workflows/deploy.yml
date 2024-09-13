@@ -1,6 +1,5 @@
 name: Deploy to GitHub Pages
 
-# This will trigger the workflow on every push to the main branch
 on:
   push:
     branches:
@@ -15,11 +14,11 @@ jobs:
       - name: Checkout repository content
         uses: actions/checkout@v3
 
-      # Set up Node.js environment
+      # Set up Node.js (use Node.js 20)
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16'
+          node-version: '20' # Update to Node.js 20
 
       # Install dependencies
       - name: Install dependencies
