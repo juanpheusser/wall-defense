@@ -1,0 +1,10 @@
+{
+  "files": {
+    "main.js": "/wall-defense/static/js/main.4a374555.js",
+    "index.html": "/wall-defense/index.html",
+    "main.4a374555.js.map": "/wall-defense/static/js/main.4a374555.js.map"
+  },
+  "entrypoints": [
+    "static/js/main.4a374555.js"
+  ]
+}
