@@ -10,14 +10,14 @@ function Game({ onGameOver }) {
   const startTimeRef = useRef();
 
   const scoreRef = useRef(0);
-const elapsedTimeRef = useRef(0);
+  const elapsedTimeRef = useRef(0);
 
   const gameStateRef = useRef({
     WIDTH: 1200,
     HEIGHT: 600,
     wallWidth: 50,
     wallHeight: 100,
-    gravity: 0.5,
+    gravity: 0.4,
     
     // Cannon variables
     cannonAngle: 45, // degrees
@@ -25,7 +25,7 @@ const elapsedTimeRef = useRef(0);
     maxAngle: 80,
     cannonAngleSpeed: 2,
     power: 0,
-    minPower: 5,
+    minPower: 3,
     maxPower: 25,
     powerIncrement: 0.3,
     cannonPos: { x: 50, y: 500 },
@@ -42,7 +42,7 @@ const elapsedTimeRef = useRef(0);
     
     // Timing variables
     lastShotTime: 0,
-    reloadTime: 250, // milliseconds
+    reloadTime: 500, // milliseconds
     
     // Spawning variables
     gameTime: 0,
@@ -55,6 +55,39 @@ const elapsedTimeRef = useRef(0);
     baseSpeedIncreaseRate: 0.0001,
     maxTimeForTwoColumns: 180000, // milliseconds
   });
+
+  const [activePowerUps, setActivePowerUps] = useState([]);
+  const flashingPowerUpRef = useRef(null);
+  const flashStartTimeRef = useRef(0);
+
+  const powerUps = [
+    { name: "+5 base cannon power", effect: () => { gameStateRef.current.minPower += 5; } },
+    { name: "+5 max cannon power", effect: () => { gameStateRef.current.maxPower += 5; } },
+    { name: "Faster reload", effect: () => { gameStateRef.current.reloadTime -= 100; } },
+    //{ name: "+1 cannon ball", effect: () => { /* To be implemented */ } },
+    //{ name: "+1 pierce power", effect: () => { /* To be implemented */ } },
+  ];
+
+  const grantRandomPowerUp = () => {
+    const randomPowerUp = powerUps[Math.floor(Math.random() * powerUps.length)];
+    randomPowerUp.effect();
+    setActivePowerUps(prev => [...prev, randomPowerUp.name]);
+    flashingPowerUpRef.current = randomPowerUp.name;
+    flashStartTimeRef.current = performance.now();
+    console.log("Power-up granted:", randomPowerUp.name);
+    setTimeout(() => {
+      flashingPowerUpRef.current = null;
+      console.log("Flashing ended");
+    }, 3000);
+  };
+
+  useEffect(() => {
+    const powerUpInterval = setInterval(() => {
+      grantRandomPowerUp();
+    }, 10000); // 60000 ms = 1 minute
+
+    return () => clearInterval(powerUpInterval);
+  }, []);
 
   class CannonBall {
     constructor(x, y, angle, power) {
@@ -92,7 +125,8 @@ const elapsedTimeRef = useRef(0);
       this.width = 20 * columns;
       this.height = height;
       this.x = WIDTH;
-      this.y = HEIGHT - 10 - this.height;
+      // Fix: Align the bottom of the attacker with the bottom of the canvas
+      this.y = HEIGHT - this.height;
       this.speed = speed;
       this.hitsSinceLastReduction = 0;
     }
@@ -112,7 +146,8 @@ const elapsedTimeRef = useRef(0);
     
     reduceHeight() {
       this.height = Math.floor(this.height / 2);
-      this.y = gameStateRef.current.HEIGHT - 10 - this.height;
+      // Fix: Update y-position when height is reduced
+      this.y = gameStateRef.current.HEIGHT - this.height;
     }
     
     isDestroyed() {
@@ -237,11 +272,31 @@ const elapsedTimeRef = useRef(0);
       10
     );
     
-    // Update HUD (Score and Time)
+    // Draw score and timer
     context.fillStyle = 'black';
     context.font = '24px Arial';
     context.fillText(`Score: ${scoreRef.current}`, 10, 30);
-    context.fillText(`Time: ${elapsedTimeRef.current}s`, gameState.WIDTH / 2 - 50, 30);
+    context.fillText(`Time: ${elapsedTimeRef.current}s`, gameState.WIDTH - 150, 30);
+    
+    // Render active power-ups
+    context.font = '16px Arial';
+    activePowerUps.forEach((powerUp, index) => {
+      context.fillText(`Active: ${powerUp}`, 10, gameState.HEIGHT - 20 - (index * 20));
+    });
+    
+    // Render flashing power-up notification
+    if (flashingPowerUpRef.current) {
+      const flashElapsedTime = performance.now() - flashStartTimeRef.current;
+      const flashOpacity = Math.sin(flashElapsedTime / 100) * 0.5 + 0.5;
+      
+      context.save();
+      context.fillStyle = `rgba(255, 0, 0, ${flashOpacity})`;
+      context.font = 'bold 36px Arial';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(flashingPowerUpRef.current, gameState.WIDTH / 2, gameState.HEIGHT / 2);
+      context.restore();
+    }
   };
 
   const spawnAttacker = () => {
@@ -308,11 +363,11 @@ const elapsedTimeRef = useRef(0);
           if (currentTime - gameStateRef.current.lastShotTime >= gameStateRef.current.reloadTime) {
             // Fire cannonball
             fireCannonball();
-            gameStateRef.current.power = 0;
+            gameStateRef.current.power = gameStateRef.current.minPower;
             gameStateRef.current.spacePressed = false;
             gameStateRef.current.lastShotTime = currentTime;
           } else {
-            gameStateRef.current.power = 0;
+            gameStateRef.current.power = gameStateRef.current.minPower;
             gameStateRef.current.spacePressed = false;
           }
         }
@@ -396,9 +451,6 @@ const elapsedTimeRef = useRef(0);
     // Render the game
     renderGame();
     
-    // Update elapsed time
-    setElapsedTime(Math.floor((time - startTimeRef.current) / 1000));
-    
     // Update score in the game loop
     setScore(scoreRef.current);
     
@@ -443,7 +495,7 @@ const elapsedTimeRef = useRef(0);
   // We'll fill in the details here
   return (
     <div>
-      <canvas ref={canvasRef} width={1200} height={600} style={canvasStyle}></canvas>
+      <canvas ref={canvasRef} width={1200} height={600} style={{ border: '1px solid black', display: 'block', margin: '0 auto' }}></canvas>
     </div>
   );
 }
