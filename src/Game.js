@@ -84,7 +84,7 @@ function Game({ onGameOver }) {
   useEffect(() => {
     const powerUpInterval = setInterval(() => {
       grantRandomPowerUp();
-    }, 30000); // 60000 ms = 1 minute
+    }, 15000); // 60000 ms = 1 minute
 
     return () => clearInterval(powerUpInterval);
   }, []);

@@ -28,6 +28,7 @@ function Menu({ onStart }) {
           <li>Destroy attackers before they reach your wall</li>
           <li>Score points for each attacker destroyed</li>
           <li>The game ends if any attacker reaches your wall</li>
+          <li>Power-ups are granted randomly every 15 seconds</li>
         </ol>
       </div>
       <p style={startPromptStyle}>Press ENTER to Start</p>
