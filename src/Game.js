@@ -52,8 +52,8 @@ function Game({ onGameOver }) {
     // Spawning variables
     gameTime: 0,
     spawnInterval: 3000,
-    minSpawnInterval: 400,
-    spawnDecreaseRate: 0.99,
+    minSpawnInterval: 100,
+    spawnDecreaseRate: 0.90,
     lastAttackerSpawnTime: performance.now(),
     initialBaseSpeed: 0.5,
     maxBaseSpeed: 5.0,
