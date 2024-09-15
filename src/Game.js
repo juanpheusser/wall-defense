@@ -47,13 +47,13 @@ function Game({ onGameOver }) {
     
     // Timing variables
     lastShotTime: 0,
-    reloadTime: 500, // milliseconds
+    reloadTime: 750, // milliseconds
     
     // Spawning variables
     gameTime: 0,
     spawnInterval: 3000,
     minSpawnInterval: 100,
-    spawnDecreaseRate: 0.90,
+    spawnDecreaseRate: 0.97,
     lastAttackerSpawnTime: performance.now(),
     initialBaseSpeed: 0.5,
     maxBaseSpeed: 5.0,
@@ -67,7 +67,7 @@ function Game({ onGameOver }) {
 
   const powerUps = [
     { name: "+5 base cannon power", effect: () => { gameStateRef.current.minPower += 5; } },
-    { name: "Faster reload", effect: () => { gameStateRef.current.reloadTime -= 100; } },
+    { name: "Faster reload", effect: () => { gameStateRef.current.reloadTime -= 50; } },
     { name: "Faster power build", effect: () => { gameStateRef.current.powerIncrement += 0.1; } },
     { name: "+1 cannon ball", effect: () => { gameStateRef.current.cannonBalls += 1; } },
     { name: "+1 pierce", effect: () => { gameStateRef.current.pierce += 1; } },
@@ -86,12 +86,77 @@ function Game({ onGameOver }) {
     }, 3000);
   };
 
+  const [flashingEvent, setFlashingEvent] = useState(null);
+  const specialEventRef = useRef(null);
+
+  const specialEvents = [
+    { 
+      name: "Antigravity", 
+      effect: () => { gameStateRef.current.gravity *= -1; },
+      revert: () => { gameStateRef.current.gravity *= -1; }
+    },
+    { 
+      name: "Moon gravity", 
+      effect: () => { gameStateRef.current.gravity /= 2; },
+      revert: () => { gameStateRef.current.gravity *= 2; }
+    },
+    { 
+      name: "Super gravity", 
+      effect: () => { gameStateRef.current.gravity *= 2; },
+      revert: () => { gameStateRef.current.gravity /= 2; }
+    },
+    { 
+      name: "Slow reload", 
+      effect: () => { gameStateRef.current.reloadTime *= 2; },
+      revert: () => { gameStateRef.current.reloadTime /= 2; }
+    },
+    { 
+      name: "Attacker superspeed", 
+      effect: () => { gameStateRef.current.attackers.forEach(attacker => attacker.speed *= 2); },
+      revert: () => { gameStateRef.current.attackers.forEach(attacker => attacker.speed /= 2); }
+    },
+    { 
+      name: "Super spawn", 
+      effect: () => { gameStateRef.current.spawnInterval *= 0.5; },
+      revert: () => { gameStateRef.current.spawnInterval *= 2; }
+    },
+  ];
+
+  const triggerSpecialEvent = () => {
+    if (specialEventRef.current) {
+      specialEventRef.current.revert();
+    }
+    const randomEvent = specialEvents[Math.floor(Math.random() * specialEvents.length)];
+    randomEvent.effect();
+    specialEventRef.current = randomEvent;
+    setFlashingEvent(randomEvent.name);
+    setTimeout(() => setFlashingEvent(null), 3000); // Flash for 3 seconds
+    setTimeout(() => {
+      if (specialEventRef.current === randomEvent) {
+        randomEvent.revert();
+        specialEventRef.current = null;
+      }
+    }, 10000); // Revert after 10 seconds
+  };
+
   useEffect(() => {
+    const specialEventInterval = setInterval(() => {
+      triggerSpecialEvent();
+    }, 60000); // Trigger every 60 seconds
+
     const powerUpInterval = setInterval(() => {
       grantRandomPowerUp();
-    }, 15000); // 60000 ms = 1 minute
+    }, 60000); // Grant power-up every 60 seconds
 
-    return () => clearInterval(powerUpInterval);
+    // Offset special events by 5 seconds
+    setTimeout(() => {
+      triggerSpecialEvent();
+    }, 5000);
+
+    return () => {
+      clearInterval(specialEventInterval);
+      clearInterval(powerUpInterval);
+    };
   }, []);
 
   const cannonballImageRef = useRef(null);
@@ -404,6 +469,17 @@ function Game({ onGameOver }) {
       context.restore();
     }
     
+    // Render flashing special event notification
+    if (flashingEvent) {
+      context.save();
+      context.fillStyle = `rgba(255, 165, 0, ${0.5 + 0.5 * Math.sin(Date.now() / 100)})`; // Bright orange
+      context.font = 'bold 36px Arial';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(flashingEvent, gameState.WIDTH / 2, gameState.HEIGHT / 2 + 50); // Position below power-up notification
+      context.restore();
+    }
+    
     // Draw explosions
     gameState.explosions.forEach(explosion => {
       explosion.draw(context);
@@ -448,7 +524,7 @@ function Game({ onGameOver }) {
     const angleRad = (-gameState.cannonAngle * Math.PI) / 180;
     
     // Calculate the cannon's "muzzle" position
-    const muzzleLength = gameState.cannonSize * 0.1; // Adjust this factor as needed
+    const muzzleLength = gameState.cannonSize * 0.7; // Adjust this factor as needed
     const muzzleX = gameState.cannonPos.x + muzzleLength * Math.cos(angleRad);
     const muzzleY = gameState.cannonPos.y + muzzleLength * Math.sin(angleRad);
     
